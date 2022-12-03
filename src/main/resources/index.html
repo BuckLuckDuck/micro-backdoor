@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>My Index</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            background-color: #282828;
+        }
+        #current-dir {
+            padding: 5px 5px;
+            margin: 10px auto;
+            display: block;
+            background-color: rgba(129, 15, 15, 0.97);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+
+        }
+        thead {
+            color: white;
+        }
+        td {
+            background-color: #282828;
+            color: white;
+            width: 60%;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <button id="current-dir" class="ui-button ui-state-default cursor-pointer ui-corner-all
+    ui-button-text-only"></button>
+</div>
+
+<!--<h1 id="current-dir" class="text-3xl font-bold underline cursor-pointer"></h1>-->
+
+<table class="min-w-full">
+    <thead class="bg-#282828 border-b">
+    <tr>
+        <th scope="col" class="text-sm font-medium px-6 py-4 text-center">Имя</th>
+        <th scope="col" class="text-sm font-medium px-6 py-4 text-center">Папка</th>
+        <th scope="col" class="text-sm font-medium px-6 py-4 text-center">Удалить</th>
+    </tr>
+    </thead>
+    <tbody id="content-block">
+    </tbody>
+</table>
+
+<script>
+    const baseUrl = "http://localhost:8080/api";
+
+    async function list_dir(path) {
+        const response = await fetch(baseUrl + "/index?path=" + path, {
+            method: "GET",
+            headers: { "Accept": "application/json"},
+        });
+        return response.json();
+    }
+
+    async function remove(path) {
+        await fetch(baseUrl + "/remove?path=" + path, {
+            method: "DELETE",
+        });
+    }
+
+    async function updateState(path) {
+        const index = await list_dir(path)
+
+        console.log(index)
+
+        updateWorkingDir(index)
+        updateItems(index)
+    }
+
+    function updateWorkingDir(index) {
+        document.getElementById("current-dir").innerText = index.path + " (Нажмите чтобы подняться выше)"
+    }
+
+    function updateItems(index) {
+        const container = document.getElementById("content-block")
+        container.innerHTML = ""
+
+        index.content.forEach((item) => {
+            const el = document.createElement("tr")
+            el.className = "bg-gray-100 border-b"
+
+            const tdClasses = "text-sm font-light px-6 py-4 whitespace-nowrap cursor-pointer text-center"
+            const nameField = document.createElement("td")
+            const isDirField = document.createElement("td")
+            const deleteBtnField = document.createElement("td")
+            const deleteBtn = document.createElement("input")
+
+            nameField.className = tdClasses + " navigate"
+            nameField.innerText = item.name
+            nameField.setAttribute("x-item-path", item.absPath)
+
+            // isDirField.className = tdClasses + " remove"
+            isDirField.className = tdClasses.replace("cursor-pointer ", "")
+            isDirField.innerText = item.isDir ? "Да" : "Нет"
+            isDirField.setAttribute("x-item-path", item.absPath)
+
+            deleteBtnField.className = tdClasses.replace("cursor-pointer ", "")
+            deleteBtn.className = "cursor-pointer del-btn remove border border-primary rounded"
+            deleteBtn.type = "button"
+            deleteBtn.value = "Удалить"
+            deleteBtn.setAttribute("x-item-path", item.absPath)
+            deleteBtnField.appendChild(deleteBtn)
+            deleteBtnField.setAttribute("x-item-path", item.absPath)
+
+            el.appendChild(nameField)
+            el.appendChild(isDirField)
+            el.appendChild(deleteBtnField)
+
+            container.appendChild(el);
+        })
+    }
+
+    // Startup event
+    updateState("C:/")
+    const history = ["C:/"]
+
+    // Domain actions
+    {
+        $("#current-dir").on("click", function () {
+            if (history.length <= 1) {
+                return
+            }
+            history.pop()
+            updateState(history.at(-1))
+        })
+
+        const contentBlock = "#content-block"
+
+        $(contentBlock).on("click", ".navigate", async function () {
+            console.log(this)
+
+            const newPath =this.getAttribute("x-item-path")
+
+            history.push(newPath)
+            await updateState(history.at(-1))
+        })
+
+        $(contentBlock).on("click", ".remove", async function () {
+            const shouldRemove = confirm(`Вы уверены что хотите удалить выбранный элемент?
+            \nЕсли вы хотите удалить папку, убедитесь, что она пустая.`)
+            if (!shouldRemove) {
+                return
+            }
+
+            const newPath = this.getAttribute("x-item-path")
+
+            await remove(newPath)
+            await updateState(history.at(-1))
+        })
+    }
+
+</script>
+</body>
+</html>
